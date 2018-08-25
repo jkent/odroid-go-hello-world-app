@@ -12,6 +12,7 @@
 #include "display.h"
 #include "keypad.h"
 
+#include "event.h"
 #include "graphics.h"
 #include "tf.h"
 #include "OpenSans_Regular_11X12.h"
@@ -24,6 +25,7 @@ void app_main(void)
     display_init();
     backlight_init();
     keypad_init();
+    event_init();
 
     xTaskCreate(helloworld_task, "helloworld", 8192, NULL, 5, NULL);
 }
@@ -31,8 +33,6 @@ void app_main(void)
 static void helloworld_task(void *arg)
 {
     tf_t *tf = tf_new(&font_OpenSans_Regular_11X12, 0xFFFF, 0, TF_ALIGN_CENTER);
-
-    QueueHandle_t keypad = keypad_get_queue();
 
     const esp_partition_t *partition = esp_ota_get_running_partition();
 
@@ -46,12 +46,15 @@ static void helloworld_task(void *arg)
     tf_draw_str(fb, tf, s, p);
     display_update();
 
-    keypad_info_t keys;
+    event_t event;
     while (true) {
-        if (keypad_queue_receive(keypad, &keys, 50/portTICK_RATE_MS)) {
-            if (keys.pressed & KEYPAD_MENU) {
-                break;
-            }
+        xQueueReceive(event_queue, &event, portMAX_DELAY);
+        if (event.type != EVENT_TYPE_KEYPAD) {
+            continue;
+        }
+
+        if (event.keypad.pressed & KEYPAD_MENU) {
+            break;
         }
     }
 
